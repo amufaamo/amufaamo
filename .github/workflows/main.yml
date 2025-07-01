@@ -1,0 +1,39 @@
+name: Build and Deploy Blog
+
+# ワークフローが実行されるタイミングを指定
+on:
+  # issuesイベント（作成、編集、クローズ）が発生した時
+  issues:
+    types: [opened, edited, closed]
+  # 手動でも実行できるようにする
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read  # Issueを読み取る権限
+      contents: write # gh-pagesブランチに書き込む権限
+    steps:
+      # ① リポジトリのコードをチェックアウト
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ② Issueからブログをビルド
+      - name: Build Blog
+        # issue-blog-action という便利なアクションを使います
+        uses: giscus/issue-blog-action@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # "blog" というラベルが付いたIssueのみを記事にします（任意）
+          labels: 'blog'
+          # "created-desc" は作成日の降順（新しい順）です
+          sort-by: 'created-desc'
+
+      # ③ ビルドしたサイトをGitHub Pagesにデプロイ
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # issue-blog-action が生成する 'dist' ディレクトリを指定
+          publish_dir: ./dist
