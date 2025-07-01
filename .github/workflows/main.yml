@@ -1,32 +1,73 @@
-name: Build and Deploy Blog
+name: Build Blog from Issues
 
 on:
   issues:
-    types: [opened, edited, closed]
+    types: [opened, edited, closed, labeled, unlabeled]
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
+    # 必要な権限を設定します
     permissions:
       issues: read
       contents: write
+
     steps:
-      # ① リポジトリのコードをチェックアウト
-      - name: Checkout
+      # ステップ1: リポジトリのコードをチェックアウト
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ② Issueからブログをビルド（★ここを再度修正しました！）
-      - name: Build Blog
-        uses: actions-cool/issues-blog-action@v3 # 新しいアクションを指定
-        with:
-          # このアクションは GITHUB_TOKEN がデフォルトなので、行自体が不要です
-          labels: 'blog'
+      # ステップ2: Issueからブログサイトをビルド
+      - name: Build static site from issues
+        # GitHub CLIを使うためにトークンを環境変数に設定
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1. HTMLファイルを出力するための 'dist' ディレクトリを作成
+          mkdir -p dist
 
-      # ③ ビルドしたサイトをGitHub Pagesにデプロイ
+          # 2. GitHub CLI を使って 'blog' ラベルのついたIssueを取得し、JSONファイルとして保存
+          #    --jq 'sort_by(.createdAt) | reverse' で作成日の新しい順に並び替え
+          gh issue list --label "blog" --json number,title,body,createdAt --jq 'sort_by(.createdAt) | reverse' > dist/issues.json
+
+          # 3. Node.js を使ってJSONからHTMLを生成
+          node -e '
+            // Node.jsのファイルシステムモジュールを読み込み
+            const fs = require("fs");
+            // 先ほど保存したJSONファイルを読み込み
+            const issues = JSON.parse(fs.readFileSync("dist/issues.json"));
+
+            // トップページ(index.html)のHTMLコンテンツを作成
+            let indexContent = "<html><head><title>My Issue Blog</title><meta charset=\"utf-8\"><style>body { font-family: sans-serif; line-height: 1.6; } a { text-decoration: none; } a:hover { text-decoration: underline; }</style></head><body><h1>My Issue Blog</h1><ul>";
+            
+            // 各Issueのループ処理
+            for (const issue of issues) {
+              const date = new Date(issue.createdAt).toLocaleDateString();
+              // トップページにIssueへのリンクを追加
+              indexContent += `<li><a href=\"${issue.number}.html\">${issue.title}</a> <small>(${date})</small></li>`;
+
+              // Issueごとの詳細ページを生成
+              // 本文の改行を<br>タグに変換する簡易的な処理
+              const bodyHtml = issue.body.replace(/\r\n/g, "<br>").replace(/\n/g, "<br>");
+              let issuePageContent = `<html><head><title>${issue.title}</title><meta charset=\"utf-8\"></head><body>`;
+              issuePageContent += `<h1>${issue.title}</h1><p>Posted on ${date}</p><hr>${bodyHtml}</body></html>`;
+              
+              // Issue番号をファイル名にしてHTMLファイルとして保存
+              fs.writeFileSync(`dist/${issue.number}.html`, issuePageContent);
+            }
+
+            indexContent += "</ul></body></html>";
+            // トップページ(index.html)をファイルとして保存
+            fs.writeFileSync("dist/index.html", indexContent);
+
+            console.log(`${issues.length} pages generated successfully!`);
+          '
+
+      # ステップ3: 生成したサイトをGitHub Pagesにデプロイ
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          # このアクションも出力先は 'dist' ディレクトリです
           publish_dir: ./dist
+
