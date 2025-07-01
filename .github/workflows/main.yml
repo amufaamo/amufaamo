@@ -16,18 +16,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ② Issueからブログをビルド（★ここを修正しました！）
+      # ② Issueからブログをビルド（★ここを再度修正しました！）
       - name: Build Blog
-        uses: yiliang114/issue-blog-action@v3 # 新しいアクションを指定
+        uses: actions-cool/issues-blog-action@v3 # 新しいアクションを指定
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # このアクションは GITHUB_TOKEN がデフォルトなので、行自体が不要です
           labels: 'blog'
-          sort-by: 'created-desc'
 
       # ③ ビルドしたサイトをGitHub Pagesにデプロイ
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # このアクションも出力先は 'dist' ディレクトリです
           publish_dir: ./dist
-
