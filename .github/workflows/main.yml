@@ -1,36 +1,69 @@
+# .github/workflows/main.yml
+
 name: Build and Deploy Jekyll Blog from Issues
 
 on:
   issues:
     types: [opened, edited, closed, labeled, unlabeled]
-  workflow_dispatch:
+  workflow_dispatch: # 手動でも実行できるようにする
+
+# GITHUB_TOKENの権限を設定
+permissions:
+  contents: write # リポジトリへの書き込み（gh-pagesブランチ作成のため）
+  pages: write    # GitHub Pagesへのデプロイのため
+  id-token: write # GitHub Pagesへの認証のため
+  issues: read    # Issueの読み込みのため
+
+# 同時実行の設定
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: read
-      pages: write
-      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }} # デプロイ先のURLをActionsに表示
 
     steps:
-      # Step 1: Checkout repository code
+      # Step 1: リポジトリのコードをチェックアウト
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Create post files from issues
+      # Step 2: "blog"ラベルのついたIssueから記事ファイルを作成
       - name: Create Posts from Issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p _posts
           gh issue list --label "blog" --json number,title,body,createdAt --jq . > issues.json
+          # もしgenerate-posts.jsが存在しない、またはうまく動かない場合はこのステップを調整する必要があります
           node .github/scripts/generate-posts.js
 
-      # Step 3: Build and deploy Jekyll site
-      - name: Build and Deploy
-        uses: actions/jekyll-build-pages@v1
+      # Step 3: RubyとJekyllの環境をセットアップ
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
         with:
-          source: ./
-          destination: ./_site
+          ruby-version: '3.1'
+          bundler-cache: true # Gemをキャッシュして高速化
+
+      # Step 4: GitHub Pages用の設定
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      # Step 5: Jekyllでサイトをビルド
+      - name: Build with Jekyll
+        run: bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
+        env:
+          JEKYLL_ENV: production
+
+      # Step 6: ビルドしたサイトのファイルをアーティファクトとしてアップロード
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+
+      # Step 7: アーティファクトをGitHub Pagesにデプロイ
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
