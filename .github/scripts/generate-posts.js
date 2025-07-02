@@ -11,13 +11,15 @@ console.log(`Found ${issues.length} issues to process.`);
 // 各Issueをループ処理して、Markdownファイルを作成します
 for (const issue of issues) {
   const date = new Date(issue.createdAt);
-  // ★★★ 変数名を安全な 'year' に変更しました！ ★★★
   const year = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
 
   // "2025-07-02-issue-15.md" のようなファイル名を作成します
   const fileName = `${year}-${mm}-${dd}-issue-${issue.number}.md`;
+  
+  // ★★★ issue.body内の特殊文字（バッククォート）を安全な形に変換します！ ★★★
+  const sanitizedBody = issue.body.replace(/`/g, '\\`');
   
   // Jekyllが読むための投稿ファイルの中身を作成します（Front Matterを含む）
   const fileContent = `---
@@ -26,16 +28,12 @@ title: "${issue.title.replace(/"/g, '\\"')}"
 date: ${issue.createdAt}
 ---
 
-${issue.body}
+${sanitizedBody}
 `;
 
   // _postsディレクトリに新しいファイルを書き出します
   fs.writeFileSync(`_posts/${fileName}`, fileContent);
   console.log(`Successfully generated: _posts/${fileName}`);
-}
-
-console.log('All posts have been generated successfully!');
-
 }
 
 console.log('All posts have been generated successfully!');
