@@ -1,3 +1,4 @@
-title: My Issue Blog # サイトのタイトル
-description: "A blog powered by GitHub Issues and Jekyll!" # サイトの説明
-theme: minima # Jekyllのデフォルトテーマ。他にもたくさんあります！
+title: My Issue Blog
+description: "A blog powered by GitHub Issues and Jekyll!"
+theme: minima
+baseurl: "/amufaamo" # ← この一行を追加！
