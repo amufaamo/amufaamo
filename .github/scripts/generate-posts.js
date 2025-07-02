@@ -11,7 +11,8 @@ console.log(`Found ${issues.length} issues to process.`);
 // 各Issueをループ処理して、Markdownファイルを作成します
 for (const issue of issues) {
   const date = new Date(issue.createdAt);
-  const<x_bin_342> = date.getFullYear();
+  // ★★★ ここを修正しました！ ★★★
+  const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
 
