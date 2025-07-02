@@ -47,7 +47,7 @@ jobs:
               // Jekyllの投稿ファイルに必要な「Front Matter」
               const fileContent = `---
 layout: post
-title: "${issue.title.replace(/"/g, '\\"')}"
+title: "${issue.title.replace(/"/g, `\\"`)}"
 date: ${issue.createdAt}
 ---
 
@@ -62,5 +62,9 @@ ${issue.body}
       - name: Build and Deploy
         uses: actions/jekyll-build-pages@v1
         with:
+          source: ./
+          destination: ./_site
+
+
           source: ./
           destination: ./_site
