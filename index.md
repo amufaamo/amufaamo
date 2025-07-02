@@ -1,1 +1,16 @@
-layout: default title: Home<div class="home"><h1 class="page-heading">Posts</h1><p>デバッグ情報: 記事の数 → {{ site.posts.size }}</p><ul class="post-list">{% for post in site.posts %}<li><span class="post-meta">{{ post.date | date: "%b %-d, %Y" }}</span><h3><a class="post-link" href="{{ post.url | relative_url }}">{{ post.title | escape }}</a></h3></li>{% endfor %}</ul></div>
+---
+layout: default
+title: Home
+---
+
+<h1>記事一覧</h1>
+
+<ul>
+  {% for post in site.posts %}
+    <li>
+      <h2><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h2>
+      <p>{{ post.excerpt }}</p>
+      <span>{{ post.date | date: "%Y-%m-%d" }}</span>
+    </li>
+  {% endfor %}
+</ul>
