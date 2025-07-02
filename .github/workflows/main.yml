@@ -1,32 +1,36 @@
-name: Generate Blog Posts
+name: Build and Deploy Jekyll Blog from Issues
 
 on:
-  push:
-    branches:
-      - main
+  issues:
+    types: [opened, edited, closed, labeled, unlabeled]
+  workflow_dispatch:
 
 jobs:
-  build:
+  build_and_deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: read
+      pages: write
+      id-token: write
 
     steps:
+      # Step 1: Checkout repository code
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      # Step 2: Create post files from issues
+      - name: Create Posts from Issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p _posts
+          gh issue list --label "blog" --json number,title,body,createdAt --jq . > issues.json
+          node .github/scripts/generate-posts.js
+
+      # Step 3: Build and deploy Jekyll site
+      - name: Build and Deploy
+        uses: actions/jekyll-build-pages@v1
         with:
-          node-version: '18'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run generate-posts.js
-        run: node .github/scripts/generate-posts.js
-
-      - name: Build site with Jekyll
-        uses: helaili/jekyll-action@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          target_branch: gh-pages
-          jekyll_src: ./
+          source: ./
+          destination: ./_site
