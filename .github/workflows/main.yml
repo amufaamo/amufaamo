@@ -1,69 +1,40 @@
-name: Build and Deploy Jekyll Blog from Issues
+// .github/scripts/generate-posts.js
 
-on:
-  issues:
-    types: [opened, edited, closed, labeled, unlabeled]
-  workflow_dispatch:
+// 必要なモジュールを読み込みます
+const fs = require('fs');
 
-jobs:
-  build_and_deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write # リポジトリへの書き込み（投稿ファイルの作成）
-      issues: read   # Issueの読み込み
-      pages: write   # GitHub Pagesへのデプロイ
-      id-token: write # デプロイ時の認証
+// GitHub Actionsの前のステップで作成された 'issues.json' ファイルを読み込みます
+const issues = JSON.parse(fs.readFileSync('issues.json', 'utf8'));
 
-    steps:
-      # 1. リポジトリのコード（_config.ymlなど）をチェックアウト
-      - name: Checkout repository
-        uses: actions/checkout@v4
+console.log(`Found ${issues.length} issues to process.`);
 
-      # 2. IssueをJekyllの投稿ファイルに変換
-      - name: Sync Issues to Posts
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # 投稿ファイルを保存するディレクトリを作成
-          mkdir -p _posts
+// 各Issueをループ処理して、Markdownファイルを作成します
+for (const issue of issues) {
+  const date = new Date(issue.createdAt);
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
 
-          # 'blog'ラベルのついたIssueをJSON形式で取得
-          gh issue list --label "blog" --json number,title,body,createdAt --jq . > issues.json
-
-          # Node.jsでIssueをMarkdownファイルに変換
-          node -e '
-            const fs = require("fs");
-            const issues = JSON.parse(fs.readFileSync("issues.json"));
-
-            for (const issue of issues) {
-              const date = new Date(issue.createdAt);
-              const yyyy = date.getFullYear();
-              const mm = String(date.getMonth() + 1).padStart(2, "0");
-              const dd = String(date.getDate()).padStart(2, "0");
-              
-              // ファイル名を "2025-07-02-issue-15.md" のような形式に
-              const fileName = `${yyyy}-${mm}-${dd}-issue-${issue.number}.md`;
-              
-              // Jekyllの投稿ファイルに必要な「Front Matter」
-              const fileContent = `---
+  // "2025-07-02-issue-15.md" のようなファイル名を作成します
+  const fileName = `${yyyy}-${mm}-${dd}-issue-${issue.number}.md`;
+  
+  // Jekyllが読むための投稿ファイルの中身を作成します（Front Matterを含む）
+  const fileContent = `---
 layout: post
-title: "${issue.title.replace(/"/g, `\\"`)}"
+title: "${issue.title.replace(/"/g, '\\"')}"
 date: ${issue.createdAt}
 ---
 
 ${issue.body}
 `;
-              fs.writeFileSync(`_posts/${fileName}`, fileContent);
-              console.log(`Generated: ${fileName}`);
-            }
-          '
-      
-      # 3. Jekyllサイトをビルドしてデプロイ
-      - name: Build and Deploy
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./
-          destination: ./_site
+
+  // _postsディレクトリに新しいファイルを書き出します
+  fs.writeFileSync(`_posts/${fileName}`, fileContent);
+  console.log(`Successfully generated: _posts/${fileName}`);
+}
+
+console.log('All posts have been generated successfully!');
+
 
 
           source: ./
