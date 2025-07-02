@@ -1,4 +1,4 @@
-name: Build Blog from Issues
+name: Build and Deploy Jekyll Blog from Issues
 
 on:
   issues:
@@ -6,68 +6,61 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build_and_deploy:
     runs-on: ubuntu-latest
-    # 必要な権限を設定します
     permissions:
-      issues: read
-      contents: write
+      contents: write # リポジトリへの書き込み（投稿ファイルの作成）
+      issues: read   # Issueの読み込み
+      pages: write   # GitHub Pagesへのデプロイ
+      id-token: write # デプロイ時の認証
 
     steps:
-      # ステップ1: リポジトリのコードをチェックアウト
+      # 1. リポジトリのコード（_config.ymlなど）をチェックアウト
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ステップ2: Issueからブログサイトをビルド
-      - name: Build static site from issues
-        # GitHub CLIを使うためにトークンを環境変数に設定
+      # 2. IssueをJekyllの投稿ファイルに変換
+      - name: Sync Issues to Posts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 1. HTMLファイルを出力するための 'dist' ディレクトリを作成
-          mkdir -p dist
+          # 投稿ファイルを保存するディレクトリを作成
+          mkdir -p _posts
 
-          # 2. GitHub CLI を使って 'blog' ラベルのついたIssueを取得し、JSONファイルとして保存
-          #    --jq 'sort_by(.createdAt) | reverse' で作成日の新しい順に並び替え
-          gh issue list --label "blog" --json number,title,body,createdAt --jq 'sort_by(.createdAt) | reverse' > dist/issues.json
+          # 'blog'ラベルのついたIssueをJSON形式で取得
+          gh issue list --label "blog" --json number,title,body,createdAt --jq . > issues.json
 
-          # 3. Node.js を使ってJSONからHTMLを生成
+          # Node.jsでIssueをMarkdownファイルに変換
           node -e '
-            // Node.jsのファイルシステムモジュールを読み込み
             const fs = require("fs");
-            // 先ほど保存したJSONファイルを読み込み
-            const issues = JSON.parse(fs.readFileSync("dist/issues.json"));
+            const issues = JSON.parse(fs.readFileSync("issues.json"));
 
-            // トップページ(index.html)のHTMLコンテンツを作成
-            let indexContent = "<html><head><title>My Issue Blog</title><meta charset=\"utf-8\"><style>body { font-family: sans-serif; line-height: 1.6; } a { text-decoration: none; } a:hover { text-decoration: underline; }</style></head><body><h1>My Issue Blog</h1><ul>";
-            
-            // 各Issueのループ処理
             for (const issue of issues) {
-              const date = new Date(issue.createdAt).toLocaleDateString();
-              // トップページにIssueへのリンクを追加
-              indexContent += `<li><a href=\"${issue.number}.html\">${issue.title}</a> <small>(${date})</small></li>`;
-
-              // Issueごとの詳細ページを生成
-              // 本文の改行を<br>タグに変換する簡易的な処理
-              const bodyHtml = issue.body.replace(/\r\n/g, "<br>").replace(/\n/g, "<br>");
-              let issuePageContent = `<html><head><title>${issue.title}</title><meta charset=\"utf-8\"></head><body>`;
-              issuePageContent += `<h1>${issue.title}</h1><p>Posted on ${date}</p><hr>${bodyHtml}</body></html>`;
+              const date = new Date(issue.createdAt);
+              const yyyy = date.getFullYear();
+              const mm = String(date.getMonth() + 1).padStart(2, "0");
+              const dd = String(date.getDate()).padStart(2, "0");
               
-              // Issue番号をファイル名にしてHTMLファイルとして保存
-              fs.writeFileSync(`dist/${issue.number}.html`, issuePageContent);
+              // ファイル名を "2025-07-02-issue-15.md" のような形式に
+              const fileName = `${yyyy}-${mm}-${dd}-issue-${issue.number}.md`;
+              
+              // Jekyllの投稿ファイルに必要な「Front Matter」
+              const fileContent = `---
+layout: post
+title: "${issue.title.replace(/"/g, '\\"')}"
+date: ${issue.createdAt}
+---
+
+${issue.body}
+`;
+              fs.writeFileSync(`_posts/${fileName}`, fileContent);
+              console.log(`Generated: ${fileName}`);
             }
-
-            indexContent += "</ul></body></html>";
-            // トップページ(index.html)をファイルとして保存
-            fs.writeFileSync("dist/index.html", indexContent);
-
-            console.log(`${issues.length} pages generated successfully!`);
           '
-
-      # ステップ3: 生成したサイトをGitHub Pagesにデプロイ
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+      
+      # 3. Jekyllサイトをビルドしてデプロイ
+      - name: Build and Deploy
+        uses: actions/jekyll-build-pages@v1
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-
+          source: ./
+          destination: ./_site
