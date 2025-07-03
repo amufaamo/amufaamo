@@ -1,4 +1,21 @@
 title: My Issue Blog
 description: "A blog powered by GitHub Issues and Jekyll!"
 theme: minima
-baseurl: "/amufaamo" # ← この一行を追加！
+baseurl: "/amufaamo"
+
+# --- ↓ここから下を追記してください↓ ---
+
+# Markdownプロセッサとしてkramdownを使用
+markdown: kramdown
+
+# シンタックスハイライターとしてrougeを使用
+highlighter: rouge
+
+# kramdownの詳細設定
+kramdown:
+  # GitHub Flavored Markdown (GFM)を有効にする
+  input: GFM
+  # コードブロックの言語が指定されていない場合、推測しない
+  guess_lang: false
+  # シンタックスハイライターにrougeを指定
+  syntax_highlighter: rouge
