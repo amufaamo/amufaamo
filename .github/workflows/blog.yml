@@ -31,7 +31,7 @@ jobs:
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              labels: 'published', // ここで指定したラベルが付いたIssueが対象
+              // labels: 'published', // ここで指定したラベルが付いたIssueが対象
               state: 'open',
             });
 
