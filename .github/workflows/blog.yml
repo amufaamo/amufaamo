@@ -1,0 +1,115 @@
+# .github/workflows/blog.yml
+
+name: Build and Deploy Blog
+
+# このワークフローが実行されるタイミングを指定します
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled, closed] # Issueが作成、編集、ラベル付け/解除、クローズされた時
+
+# 実行される処理を定義します
+jobs:
+  build:
+    runs-on: ubuntu-latest # 最新のUbuntu環境で実行します
+
+    steps:
+      # 1. リポジトリのコードをチェックアウトします
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Issueの内容からHTMLファイルを生成します
+      - name: Build Blog from Issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs').promises;
+            const path = require('path');
+            const showdown = require('showdown'); // MarkdownをHTMLに変換するライブラリ
+            const converter = new showdown.Converter();
+
+            // 'published' ラベルが付いているIssueのみを取得
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'published', // ここで指定したラベルが付いたIssueが対象
+              state: 'open',
+            });
+
+            // publicディレクトリがなければ作成
+            const dir = 'public';
+            await fs.mkdir(dir, { recursive: true });
+
+            // トップページのHTMLを生成
+            let indexHtml = `
+              <!DOCTYPE html>
+              <html lang="ja">
+              <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>My Blog</title>
+                <style>
+                  body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+                  h1 { text-align: center; }
+                  ul { list-style: none; padding: 0; }
+                  li { margin-bottom: 1.5rem; border-bottom: 1px solid #eee; padding-bottom: 1rem; }
+                  a { text-decoration: none; color: #0366d6; }
+                  a:hover { text-decoration: underline; }
+                  small { color: #586069; }
+                </style>
+              </head>
+              <body>
+                <h1>My Blog</h1>
+                <ul>
+            `;
+
+            // 各Issueを記事ページとして生成
+            for (const issue of issues) {
+              const title = issue.title;
+              const body = issue.body;
+              const htmlBody = converter.makeHtml(body);
+              const createdAt = new Date(issue.created_at).toLocaleDateString('ja-JP');
+              const fileName = `issue-${issue.number}.html`;
+
+              // トップページに記事へのリンクを追加
+              indexHtml += `
+                <li>
+                  <h2><a href="${fileName}">${title}</a></h2>
+                  <small>投稿日: ${createdAt}</small>
+                </li>
+              `;
+              
+              // 記事単体のHTMLを生成
+              const articleHtml = `
+                <!DOCTYPE html>
+                <html lang="ja">
+                <head>
+                  <meta charset="UTF-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <title>${title}</title>
+                  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.5.1/github-markdown.min.css">
+                   <style>
+                    body { box-sizing: border-box; min-width: 200px; max-width: 980px; margin: 0 auto; padding: 45px; }
+                   </style>
+                </head>
+                <body class="markdown-body">
+                  <h1>${title}</h1>
+                  <p><small>投稿日: ${createdAt}</small> | <a href="${issue.html_url}" target="_blank">Issueでコメントする</a></p>
+                  <hr>
+                  ${htmlBody}
+                  <hr>
+                  <a href="index.html">ホームに戻る</a>
+                </body>
+                </html>
+              `;
+              await fs.writeFile(path.join(dir, fileName), articleHtml);
+            }
+
+            indexHtml += '</ul></body></html>';
+            await fs.writeFile(path.join(dir, 'index.html'), indexHtml);
+
+      # 3. 生成したHTMLをGitHub Pagesにデプロイします
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public # 公開するディレクトリを指定
